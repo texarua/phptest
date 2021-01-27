@@ -1,5 +1,9 @@
 <?php 
-
+    const STATUS = [
+        'PLANNING' => 1,
+        'DOING' => 2,
+        'COMPLETE' => 3,
+    ];
 
 ?>
 
@@ -27,6 +31,7 @@
                 <th scope="col">Work Name</th>
                 <th scope="col">Starting Date</th>
                 <th scope="col">Ending Date</th>
+                <th scope="col">Status</th>
                 <th scope="col">Options</th>
                 </tr>
             </thead>
@@ -38,7 +43,11 @@
                     <td><?php echo $todo->work_name?></td>
                     <td><?php echo $todo->starting_date?></td>
                     <td><?php echo $todo->ending_date?></td>
-                    <td><button class="btn-danger" data-id="<?php echo $todo->id?>" id="delete">Delete</button></td>
+                    <td><?php echo array_search($todo->status, STATUS)?></td>
+                    <td>
+                    <button class="btn-danger edit" data-id="<?php echo $todo->id?>">Show</button>    
+                    <button class="btn-danger delete" data-id="<?php echo $todo->id?>">Delete</button>
+                    </td>
                 </tr>
                 <?php }?>
                 <?php endif ?>
@@ -46,19 +55,21 @@
             </table>
             <div class="container d-flex justify-content-center">
                 <div class=" w-100">
-                    <h4>Add / Edit ToDo <button id="add" data-href="" class="btn btn-warning mt-2 px-5">Add <i class="fa fa-long-arrow-right ml-2 mt-1"></i></button></h4>
+                    <h4>Add / Edit ToDo <button id="add" data-href="" class="btn btn-warning mt-2 px-5">Add New Todo <i class="fa fa-long-arrow-right ml-2 mt-1"></i></button></h4>
                     <div class="row">
-                    <div class="col-md-6"> <input type="text" name="id" class="form-control" placeholder="Id" /> </div>
-                        <div class="col-md-6"> <input type="text" name="name_work" class="form-control" placeholder="Works Name" /> </div>
+                    <div class="col-md-6"> <input type="text" readonly="readonly" name="id" class="form-control" placeholder="Id" /> </div>
+                        <div class="col-md-6"> <input type="text" name="work_name" class="form-control" placeholder="Works Name" /> </div>
                         <div class="col-md-6"> <input type="text" name="starting_date" class="form-control date" placeholder="Starting Date" /> </div>
                         <div class="col-md-6"> <input type="text" name="ending_date" class="form-control date" placeholder="Ending Date" /> </div>
+                        <div class="col-md-6"> <input type="text" name="status" class="form-control" placeholder="Status" /> </div>
+                        <div class="col-md-6"> ( 1: PLANNING, 2: DOING, 3: COMPLETE ) </div>
                     </div>
-                    <div class="pull-left"> <button data-href="" class="btn btn-success mt-2 px-5">Submit <i class="fa fa-long-arrow-right ml-2 mt-1"></i></button> </div>
+                    <div class="pull-left"> <button data-href="" class="btn btn-success mt-2 px-5">Submit <i class="fa fa-long-arrow-right ml-2 mt-1"></i></button></div>
                 </div>
             </div>
         </div>
         <div class="col-6">
-        <h3>Calendar</h3>
+        <h3>Todo Calendar</h3>
             <div id='calendar'></div>          
         </div>
     </div>
@@ -73,9 +84,29 @@
 </script>
 <script>
     $("#add").click(function() {
+        $('input').val('');
+        $('.btn-success').text('Add');
         $('.btn-success').attr('data-href', '/controller/manage.php?type=add')
     })
-    $('.btn-success').click(function () {
+    $(document).on('click',".edit",function() {
+        $('.btn-success').text('Edit');
+        $('.btn-success').attr('data-href', '/controller/manage.php?type=edit')
+        let id = $(this).attr('data-id');
+        $.ajax({
+            url: '/controller/manage.php?type=show',
+            method: 'POST',
+            data: {id},
+            success: function (response) {
+                let todo = JSON.parse(response)[0];
+                $('input[name="id"]').val(todo.id);
+                $('input[name="work_name"]').val(todo.work_name);
+                $('input[name="starting_date"]').val(todo.starting_date);
+                $('input[name="ending_date"]').val(todo.ending_date);
+                $('input[name="status"]').val(todo.status);
+            }
+        })
+    })
+    $(document).on('click','.btn-success', function () {
             let inputData = $('input').serialize();
             let href = $(this).attr('data-href');
             $.ajax({
@@ -83,30 +114,68 @@
                 method: 'POST',
                 data: inputData,
                 success: function (response) {
-                    let todo = JSON.parse(response);
-                    let content = '<tr>'
-                    +'<th scope="row">'+todo.id+'</th>'
-                    +'<td scope="row">'+todo.work_name+'</td>'
-                    +'<td scope="row">'+todo.starting_date+'</td>'
-                    +'<td scope="row">'+todo.ending_date+'</td>'
-                    '<td><button class="btn-danger" data-id="'+todo.id+'" id="delete">Delete</button></td>'
-                +'</tr>';
-                    $('tbody').append(content)
+                    loadAllAjax();
                 }
             })
         });
 
-    $('.btn-danger').click(function () {
+    function getContentToDo(todo) {
+        return '<tr>'
+                    +'<th scope="row">'+todo.id+'</th>'
+                    +'<td scope="row">'+todo.work_name+'</td>'
+                    +'<td scope="row">'+todo.starting_date+'</td>'
+                    +'<td scope="row">'+todo.ending_date+'</td>'
+                    +'<td scope="row">'+todo.status+'</td>'
+                    +'<td><button class="btn-danger edit" data-id="'+todo.id+'">Show</button>'
+                    +'<button class="btn-danger delete" data-id="'+todo.id+'" id="delete">Delete</button>'
+                    +'</td>'
+                +'</tr>';
+    }
+
+    $(document).on('click','.delete', function () {
        let id = $(this).attr('data-id');
+       let element = $(this);
         $.ajax({
             url: '/controller/manage.php?type=del',
             method: 'POST',
             data: {id},
             success: function (response) {
-                $(this).cloest('tr').remove();
+                $(element).closest('tr').remove();
             }
         })
     });
+
+    function getAllAjax() {
+        $.ajax({
+            url: '/controller/manage.php?type=allAjax',
+            method: 'POST',
+            success: function (response) {
+                let todos = JSON.parse(response);
+                let content = '';
+                todos.forEach(function (todo) {
+                    content += getContentToDo(todo);
+                })
+                $('.table-dark tbody').html(content);
+                    
+            }
+        })
+    }
+
+    function loadAllAjax() {
+        $.ajax({
+            url: '/controller/manage.php?type=allAjax',
+            method: 'POST',
+            success: function (response) {
+                let todos = JSON.parse(response);
+                let content = '';
+                todos.forEach(function (todo) {
+                    content += getContentToDo(todo);
+                })
+                $('.table-dark tbody').html(content);
+                    
+            }
+        })
+    };
 </script>
 
 <script src="//code.jquery.com/jquery-1.11.3.min.js"></script>
@@ -118,11 +187,16 @@
                     $('#calendar').fullCalendar({
                         // put your options and callbacks here
                         events : [
-                            <?php foreach($tasks as $task) { ?>
+                            <?php foreach($listToDo as $todo) { ?>
                             {
-                                title : '{{ $task->name }}',
-                                start : '{{ $task->task_date }}',
-                                url : '{{ route('tasks.edit', $task->id) }}'
+                                title : '<?php echo $todo->work_name?>',
+                                start : '<?php echo $todo->starting_date?>',
+                                end  : '<?php echo $todo->ending_date?>',
+                                color: '<?php 
+                                    if($todo->status == 1) echo 'blue';
+                                    else if ($todo->status == 2) echo 'yellow';
+                                    else if ($todo->status == 3) echo 'green';
+                                ?>'
                             },
                             <?php } ?>
                         ]
