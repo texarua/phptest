@@ -7,7 +7,7 @@ class ToDoDAO
     public function __construct()
     {
         try {
-            $this->conn = new PDO("mysql:host=".SERVER_NAME.";dbname=".DATABASE, 'root', '');
+            $this->conn = new PDO("mysql:host=".SERVER_NAME.";dbname=".DATABASE, USER_NAME, PASSWORD);
         } catch (PDOException $e) {
             die($e->getMessage());
         }
